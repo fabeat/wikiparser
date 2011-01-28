@@ -47,6 +47,24 @@ Done.
 *# back down one
 Done.
 
+== Complex Bullet test ==
+* I
+* I
+*# II
+*# II
+*#* III
+*#* III
+* I
+** II
+** II
+*** III
+*** III
+***# IV
+***# IV
+***# IV
+* I
+
+
 == Definition list ==
 ; yes : opposite of no
 ; no : opposite of yes

@@ -200,6 +200,7 @@ class WikiParser
     );
 
     $output = "";
+    $closed_list = false;
 
     $newlevel = ($close) ? 0 : strlen($matches[1]);
 
@@ -221,6 +222,7 @@ class WikiParser
       if ($listtype[0]=='/')
       {
         $output .= "</li>\n<{$listtype}>\n";
+        $closed_list = true;
       }
       else
       {
@@ -233,7 +235,7 @@ class WikiParser
       return $output;
     }
 
-    if (empty($output))
+    if (empty($output) OR ($closed_list && $this->list_level > 0))
     {
       $output .= "</li>\n<li>";
     }
