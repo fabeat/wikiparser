@@ -38,8 +38,6 @@
 
 class WikiParser
 {
-  protected $reference_wiki = '';
-  protected $image_uri = '';
   protected $emphasis = array();
 
   protected $page_title = '';
@@ -57,18 +55,43 @@ class WikiParser
   protected $stop_all = false;
 
   protected $preformat = false;
+
+  /**
+   * Options - can be set by the constructor or by setOption().
+   *
+   * @var array
+   * @see setOption
+   */
   protected $options = array(
-    'ignore_images' => true
+    'strip_internal_links'    => false,
+    'internal_link_prefix'    => null,
+    'strip_images'            => false,
+    'reduce_images_to_title'  => false,
+    'image_prefix'            => null,
+    'image_parser_callback'   => null,
+    'clean_html'              => true,
   );
 
+  /**
+   * Constructor.
+   *
+   * @param array  $options       An array of options
+   * @see setOption
+   */
   public function __construct($options = array())
   {
     foreach ($options as $key => $val)
     {
-      $this->options[$key] = $val;
+      $this->setOption($key, $val);
     }
   }
 
+  /**
+   * Get an option
+   *
+   * @param string  $name       Name of the option to get
+   * @see setOption
+   */
   public function getOption($name)
   {
     if (array_key_exists($name, $this->options))
@@ -81,6 +104,22 @@ class WikiParser
     }
   }
 
+  /**
+   * Set an option
+   *
+   * Available options:
+   *
+   *  * strip_internal_links:         Whether to strip all internal links
+   *  * internal_link_prefix:         Prefix for all internal wiki links. I.e. http://en.wikipedia.org/wiki/
+   *  * strip_images:                 Whether to strip image tags
+   *  * reduce_images_to_title:       Whether to reduce all images to their (text) title
+   *  * image_prefix:                 Prefix-URL for all Images
+   *  * image_parser_callback:        Callback to be used instead of handle_image. See handle_image for arguments & return value.
+   *  * clean_html:                   Clean HTML using DOMDocument
+   *
+   * @param string  $name       Name of the option to set
+   * @param mixed  $value       Valueof the option to set
+   */
   public function setOption($name, $value)
   {
     if (array_key_exists($name, $this->options))
@@ -91,6 +130,44 @@ class WikiParser
     {
       throw new InvalidArgumentException("The Option '$name' does not exist!");
     }
+  }
+
+  /**
+   * Parse wiki markup
+   *
+   *
+   * @param string  $text       Text of the document
+   * @param string  $title      Title of the document (used for the PAGENAME variable)
+   */
+  public function parse($text, $title = "")
+  {
+    $this->page_title = $title;
+
+    $output = "";
+
+    $text = preg_replace_callback('/<nowiki>([\s\S]*)<\/nowiki>/i',array($this,"handle_save_nowiki"),$text);
+
+    $lines = explode("\n",$text);
+
+    if (preg_match('/^\#REDIRECT\s+\[\[(.*?)\]\]$/',trim($lines[0]),$matches))
+    {
+      $this->redirect = $matches[1];
+    }
+
+    foreach ($lines as $k=>$line)
+    {
+      $line = $this->parse_line($line);
+      $output .= $line;
+    }
+
+    $output = preg_replace_callback('/<nowiki><\/nowiki>/i', array($this,"handle_restore_nowiki"),$output);
+
+    if ($this->getOption('clean_html'))
+    {
+      $output = $this->clean_html($output);
+    }
+
+    return $output;
   }
 
   protected function handle_sections($matches)
@@ -115,7 +192,7 @@ class WikiParser
     return $this->emphasize_off() . "<br /><br />";
   }
 
-  protected function handle_list($matches, $close=false)
+  protected function handle_list($matches, $close = false)
   {
     $listtypes = array(
       '*'=>'ul',
@@ -126,14 +203,12 @@ class WikiParser
 
     $newlevel = ($close) ? 0 : strlen($matches[1]);
 
-    while ($this->list_level!=$newlevel)
+    while ($this->list_level != $newlevel)
     {
-      $listchar = substr($matches[1],-1);
+      $listchar = substr($matches[1], -1);
       $listtype = $listtypes[$listchar];
 
-      //$output .= "[".$this->list_level."->".$newlevel."]";
-
-      if ($this->list_level>$newlevel)
+      if ($this->list_level > $newlevel)
       {
         $listtype = '/'.array_pop($this->list_level_types);
         $this->list_level--;
@@ -141,9 +216,16 @@ class WikiParser
       else
       {
         $this->list_level++;
-        array_push($this->list_level_types,$listtype);
+        array_push($this->list_level_types, $listtype);
       }
-      $output .= "\n<{$listtype}>\n";
+      if ($listtype[0]=='/')
+      {
+        $output .= "</li>\n<{$listtype}>\n";
+      }
+      else
+      {
+        $output .= "\n<{$listtype}>\n<li>";
+      }
     }
 
     if ($close)
@@ -151,7 +233,11 @@ class WikiParser
       return $output;
     }
 
-    $output .= "<li>".$matches[2]."</li>\n";
+    if (empty($output))
+    {
+      $output .= "</li>\n<li>";
+    }
+    $output .= $matches[2];
 
     return $output;
   }
@@ -168,7 +254,7 @@ class WikiParser
     if (!$this->deflist) $output .= "<dl>\n";
     $this->deflist = true;
 
-    switch($matches[1])
+    switch ($matches[1])
     {
       case ';':
         $term = $matches[2];
@@ -226,23 +312,24 @@ class WikiParser
 
   protected function handle_image($href, $title, $options)
   {
-    if ($this->getOption('ignore_images'))
+    if ($this->getOption('strip_images'))
     {
       return "";
     }
 
-    if (!$this->image_uri)
+    if ($this->getOption('reduce_images_to_title'))
     {
       return $title;
     }
 
-    $href = $this->image_uri . $href;
+    $href = $this->getOption('image_prefix') . $href;
 
     $imagetag = sprintf(
       '<img src="%s" alt="%s" />',
       $href,
       $title
     );
+
     foreach ($options as $k=>$option)
     {
       switch($option)
@@ -271,37 +358,34 @@ class WikiParser
 
   protected function handle_internallink($matches)
   {
-    //var_dump($matches);
-    $nolink = false;
-
     $href = $matches[4];
     $title = $matches[6] ? $matches[6] : $href.$matches[7];
     $namespace = $matches[3];
 
-    if ($namespace=='Image')
+    if (in_array($namespace, array('Image', 'File')))
     {
       $options = explode('|',$title);
       $title = array_pop($options);
 
-      return $this->handle_image($href,$title,$options);
+      if (null === $this->getOption('image_parser_callback'))
+      {
+        return $this->handle_image($href,$title,$options);
+      }
+      else
+      {
+        call_user_func($this->getOption('image_parser_callback'), $href, $title, $options);
+      }
     }
 
     $title = preg_replace('/\(.*?\)/','',$title);
     $title = preg_replace('/^.*?\:/','',$title);
 
-    if ($this->reference_wiki)
-    {
-      $href = $this->reference_wiki.($namespace?$namespace.':':'').$this->wiki_link($href);
-    }
-    else
-    {
-      $nolink = true;
-    }
-
-    if ($nolink)
+    if ($this->getOption('strip_internal_links'))
     {
       return $title;
     }
+
+    $href = $this->getOption('internal_link_prefix').($namespace?$namespace.':':'').$this->wiki_link($href);
 
     return sprintf(
       '<a href="%s"%s>%s</a>',
@@ -410,7 +494,6 @@ class WikiParser
       'horizontalrule'=>'^----$',
     );
     $char_regexes = array(
-      //'link'=>'(\[\[((.*?)\:)?(.*?)(\|(.*?))?\]\]([a-z]+)?)',
       'internallink'=>'('.
         '\[\['. // opening brackets
           '(([^\]]*?)\:)?'. // namespace (if any)
@@ -456,7 +539,8 @@ class WikiParser
       foreach ($char_regexes as $func=>$regex)
       {
         $line = preg_replace_callback("/$regex/i",array($this,"handle_".$func),$line);
-        if ($this->stop){
+        if ($this->stop)
+        {
           break;
         }
       }
@@ -487,40 +571,34 @@ class WikiParser
     return $line;
   }
 
-  public function parse($text, $title="")
-  {
-    $this->page_title = $title;
-
-    $output = "";
-
-    $text = preg_replace_callback('/<nowiki>([\s\S]*)<\/nowiki>/i',array($this,"handle_save_nowiki"),$text);
-
-    $lines = explode("\n",$text);
-
-    if (preg_match('/^\#REDIRECT\s+\[\[(.*?)\]\]$/',trim($lines[0]),$matches))
-    {
-      $this->redirect = $matches[1];
-    }
-
-    foreach ($lines as $k=>$line)
-    {
-      $line = $this->parse_line($line);
-      $output .= $line;
-    }
-
-    $output = preg_replace_callback('/<nowiki><\/nowiki>/i',array($this,"handle_restore_nowiki"),$output);
-
-    return $output;
-  }
-
-  function handle_save_nowiki($matches)
+  protected function handle_save_nowiki($matches)
   {
     array_push($this->nowikis,$matches[1]);
     return "<nowiki></nowiki>";
   }
 
-  function handle_restore_nowiki($matches)
+  protected function handle_restore_nowiki($matches)
   {
     return array_pop($this->nowikis);
+  }
+
+  /**
+   * Use DOMDocument to validate HTML.
+   */
+  protected function clean_html($html)
+  {
+    $doc = new DOMDocument();
+    $doc->validateOnParse = true;
+    @$doc->loadHTML($html);
+    $newHtml = $doc->saveHTML();
+    $newHtml = $this->get_cuted_text_part('<body>', '</body>', $newHtml);
+    return $newHtml;
+  }
+
+  protected function get_cuted_text_part($from, $to, $text)
+  {
+    $startPos = strpos($text, $from, 0) + strlen($from);
+    $endPos = strpos($text, $to, 0);
+    return substr($text, $startPos, $endPos-$startPos);
   }
 }

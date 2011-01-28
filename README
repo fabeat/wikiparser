@@ -12,6 +12,14 @@ http://code.blitzaffe.com/pages/phpclasses/files/wiki_parser_52-13
 This class translates wiki formatting into HTML.
 
 
+QUICK INFO
+
+I used
+> php ./example.php > example.html
+
+To convert example.txt into example.html
+
+
 EXAMPLE
 
 require_once(dirname(__FILE__).'/lib/WikiParser.class.php');
