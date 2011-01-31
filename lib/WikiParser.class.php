@@ -70,6 +70,7 @@ class WikiParser
     'image_prefix'            => null,
     'image_parser_callback'   => null,
     'clean_html'              => true,
+    'use_semantic_emphasis'   => false,
   );
 
   /**
@@ -418,12 +419,24 @@ class WikiParser
 
   protected function emphasize($amount)
   {
-    $amounts = array(
-      2 => array('<em>','</em>'),
-      3 => array('<strong>','</strong>'),
-      4 => array('<strong>','</strong>'),
-      5 => array('<em><strong>','</strong></em>'),
-    );
+    if ($this->getOption('use_semantic_emphasis'))
+    {
+      $amounts = array(
+        2 => array('<em>','</em>'),
+        3 => array('<strong>','</strong>'),
+        4 => array('<strong>','</strong>'),
+        5 => array('<em><strong>','</strong></em>'),
+      );
+    }
+    else
+    {
+      $amounts = array(
+        2 => array('<i>','</i>'),
+        3 => array('<b>','</b>'),
+        4 => array('<b>','</b>'),
+        5 => array('<b><i>','</i></b>'),
+      );
+    }
 
     $output = "";
 
