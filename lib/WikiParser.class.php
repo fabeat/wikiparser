@@ -117,7 +117,7 @@ class WikiParser
    *  * image_prefix:                 Prefix-URL for all Images
    *  * image_parser_callback:        Callback to be used instead of handle_image. See handle_image for arguments & return value.
    *  * clean_html:                   Clean HTML using DOMDocument
-   *  * use_semantic_emphasis:        Whether to use emphasis (use <em> instead of <i> when set to true)
+   *  * use_semantic_emphasis:        Whether to use semantic emphasis (use <em> instead of <i> when set to true)
    *
    * @param string  $name       Name of the option to set
    * @param mixed  $value       Valueof the option to set
