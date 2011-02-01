@@ -445,15 +445,15 @@ class WikiParser
 
     // handle cases where emphasized phrases end in an apostrophe, eg: ''somethin'''
     // should read <em>somethin'</em> rather than <em>somethin<strong>
-    if ( (!$this->emphasis[$amount]) && ($this->emphasis[$amount-1]) )
+    if ( empty($this->emphasis[$amount]) && !empty($this->emphasis[$amount-1]) )
     {
       $amount--;
       $output = "'";
     }
 
-    $output .= $amounts[$amount][(int) $this->emphasis[$amount]];
+    $output .= $amounts[$amount][(int) !empty($this->emphasis[$amount])];
 
-    $this->emphasis[$amount] = !$this->emphasis[$amount];
+    $this->emphasis[$amount] = empty($this->emphasis[$amount]);
 
     return $output;
   }
@@ -583,7 +583,7 @@ class WikiParser
     // suppress linebreaks for the next line if we just displayed one; otherwise re-enable them
     if ($isline)
     {
-      $this->suppress_linebreaks = ($called['newline'] || $called['sections']);
+      $this->suppress_linebreaks = (!empty($called['newline']) || !empty($called['sections']));
     }
 
     return $line;
