@@ -71,6 +71,7 @@ class WikiParser
     'image_parser_callback'   => null,
     'clean_html'              => true,
     'use_semantic_emphasis'   => false,
+    'input_charset'           => 'utf-8',
   );
 
   /**
@@ -118,6 +119,7 @@ class WikiParser
    *  * image_parser_callback:        Callback to be used instead of handle_image. See handle_image for arguments & return value.
    *  * clean_html:                   Clean HTML using DOMDocument
    *  * use_semantic_emphasis:        Whether to use semantic emphasis (use <em> instead of <i> when set to true)
+   *  * input_charset:                Input charset of the wiki markup (Used for HTML cleaning, The output charset is the same)
    *
    * @param string  $name       Name of the option to set
    * @param mixed  $value       Valueof the option to set
@@ -605,6 +607,14 @@ class WikiParser
   {
     $doc = new DOMDocument();
     $doc->validateOnParse = true;
+    $html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+      <html xmlns="http://www.w3.org/1999/xhtml">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset='.$this->getOption('input_charset').'" />
+        <title>EMPTY</title>
+      </head>
+      <body>'.$html.'</body></html>';
+
     @$doc->loadHTML($html);
     $newHtml = $doc->saveHTML();
     $newHtml = $this->get_cuted_text_part('<body>', '</body>', $newHtml);
